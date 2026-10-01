@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    host: str = "127.0.0.1"
+    host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "INFO"
 
