@@ -1,25 +1,20 @@
-```dockerfile
 FROM python:3.12-slim
 
-# Install FFmpeg and basic system dependencies
+# Install FFmpeg and DejaVu fonts for burned-in captions
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python dependencies first for better Docker layer caching
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
 COPY . .
 
-# Railway provides PORT at runtime
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
-```
