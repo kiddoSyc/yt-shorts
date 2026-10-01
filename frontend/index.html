@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube-to-Shorts AI</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>YouTube&nbsp;→&nbsp;Shorts</h1>
+      <p class="subtitle">Paste a link, pick a length, get AI-picked vertical clips with captions.</p>
+    </header>
+
+    <section class="card" id="form-card">
+      <form id="job-form">
+        <label for="url">YouTube URL</label>
+        <input type="text" id="url" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
+        <p class="field-error" id="url-error"></p>
+
+        <div class="field-row">
+          <div class="field-col">
+            <label>Clip duration</label>
+            <div class="duration-options" id="duration-options">
+              <button type="button" class="chip" data-duration="30">30s</button>
+              <button type="button" class="chip" data-duration="40">40s</button>
+              <button type="button" class="chip active" data-duration="60">60s</button>
+              <button type="button" class="chip" data-duration="custom">Custom</button>
+            </div>
+            <input type="number" id="custom-duration" placeholder="Seconds (15-180)" min="15" max="180"
+                   class="hidden" inputmode="numeric">
+          </div>
+
+          <div class="field-col">
+            <label for="num-clips">Number of clips</label>
+            <select id="num-clips" name="num-clips">
+              <option value="">Let AI decide (default)</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="generate-btn" class="primary-btn">Generate Shorts</button>
+      </form>
+    </section>
+
+    <section class="card hidden" id="status-card">
+      <div class="status-header">
+        <h2 id="status-title">Processing…</h2>
+        <span class="status-badge" id="status-badge">queued</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <p class="status-detail" id="status-detail">Starting…</p>
+      <button type="button" class="link-btn hidden" id="cancel-poll-btn">Stop watching this job</button>
+    </section>
+
+    <section class="card error-card hidden" id="error-card">
+      <h2>Something went wrong</h2>
+      <p id="error-detail"></p>
+      <button type="button" class="secondary-btn" id="retry-btn">Try again</button>
+    </section>
+
+    <section class="card hidden" id="results-card">
+      <div class="results-header">
+        <h2>Your Shorts</h2>
+        <button type="button" class="secondary-btn" id="download-all-btn">Download all (.zip)</button>
+      </div>
+      <p class="empty-note hidden" id="empty-note">
+        Processing finished, but no Shorts were produced. See the limitations note in the README, or try a
+        different video/duration.
+      </p>
+      <div class="shorts-grid" id="shorts-grid"></div>
+      <button type="button" class="link-btn" id="new-job-btn">Start another</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
