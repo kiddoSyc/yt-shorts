@@ -1,8 +1,14 @@
 FROM python:3.12-slim
 
-# Install FFmpeg and DejaVu fonts for burned-in captions
+# Install FFmpeg, Deno and DejaVu fonts
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        fonts-dejavu \
+        curl \
+        unzip \
+    && curl -fsSL https://deno.land/install.sh | sh \
+    && ln -s /root/.deno/bin/deno /usr/local/bin/deno \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
