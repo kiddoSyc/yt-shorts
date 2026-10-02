@@ -1,6 +1,8 @@
 """Central configuration, loaded from environment variables / .env."""
+import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -131,8 +133,65 @@ class Settings(BaseSettings):
         Lets a host with no persistent file storage (e.g. Railway) pass cookies as plain env text."""
         if self.ytdlp_cookies_content and not self.ytdlp_cookies_file:
             path = self.resolve(self.data_dir) / "cookies.txt"
-            path.write_text(self.ytdlp_cookies_content, encoding="utf-8")
+            path.write_text(normalize_netscape_cookies(self.ytdlp_cookies_content), encoding="utf-8")
             self.ytdlp_cookies_file = str(path)
+
+
+_NETSCAPE_HEADER = "# Netscape HTTP Cookie File"
+
+
+def normalize_netscape_cookies(raw: str) -> str:
+    """Best-effort repair of a pasted cookies.txt so it still parses after going through a
+    web form (copy/paste commonly loses tabs or the header comment). Three fixes:
+    - normalizes line endings and strips stray surrounding whitespace/quotes
+    - converts a JSON cookie export (e.g. from "EditThisCookie"-style extensions) to Netscape format
+    - reconstructs tabs on cookie lines where they were collapsed to spaces, and adds the
+      required header line if it's missing
+    Lines that don't clearly fit the expected 7-field shape are left untouched rather than guessed at.
+    """
+    text = raw.strip().strip('"\'')
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if not text:
+        return text
+
+    if text.lstrip().startswith(("[", "{")):
+        try:
+            text = _cookies_json_to_netscape(json.loads(text))
+        except (ValueError, TypeError, KeyError):
+            pass  # not actually valid JSON cookies - fall through and let yt-dlp report it
+
+    lines = text.split("\n")
+    fixed = []
+    for line in lines:
+        if not line.strip() or line.startswith("#"):
+            fixed.append(line)
+            continue
+        if "\t" not in line:
+            parts = line.split()
+            if len(parts) == 7:
+                line = "\t".join(parts)
+        fixed.append(line)
+    text = "\n".join(fixed)
+
+    if not text.startswith(_NETSCAPE_HEADER) and not text.startswith("# HTTP Cookie File"):
+        text = f"{_NETSCAPE_HEADER}\n{text}"
+    return text + "\n"
+
+
+def _cookies_json_to_netscape(data: Any) -> str:
+    """Convert a JSON cookie export (list of cookie objects) to Netscape TSV format."""
+    if not isinstance(data, list):
+        raise TypeError("expected a JSON array of cookie objects")
+    lines = [_NETSCAPE_HEADER]
+    for c in data:
+        domain = c["domain"]
+        path = c.get("path", "/")
+        secure = "TRUE" if c.get("secure") else "FALSE"
+        include_sub = "TRUE" if domain.startswith(".") else "FALSE"
+        expiry = c.get("expirationDate") or c.get("expires") or 0
+        lines.append("\t".join([domain, include_sub, path, secure, str(int(expiry)),
+                                c["name"], str(c["value"])]))
+    return "\n".join(lines)
 
 
 @lru_cache
