@@ -1,7 +1,7 @@
 """Shared data structures passed between pipeline stages."""
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -33,6 +33,9 @@ class ProcessingSession:
     clip_duration: int  # target seconds per clip (validated)
     session_id: str = ""
     max_moments: Optional[int] = None  # None = use settings.max_moments
+    moment_prompt: Optional[str] = None  # user steer for what AI should look for, e.g. "funny moments"
+    manual_ranges: Optional[List[Tuple[float, float]]] = None  # user-picked (start, end) seconds;
+    # when set, AI moment detection is skipped entirely and these exact ranges are clipped instead
 
 
 @dataclass

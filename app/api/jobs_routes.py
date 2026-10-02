@@ -61,7 +61,9 @@ def _short_entries(job: Job) -> List[Dict[str, Any]]:
 @router.post("/jobs")
 def create_job(body: JobCreateRequest) -> Dict[str, Any]:
     """Start processing a YouTube URL. Returns immediately with a job id to poll."""
-    session = new_session(body.url, body.clip_duration, max_moments=body.num_clips)
+    ranges = [(r.start, r.end) for r in body.manual_ranges] if body.manual_ranges else None
+    session = new_session(body.url, body.clip_duration, max_moments=body.num_clips,
+                          moment_prompt=body.prompt, manual_ranges=ranges)
     job = get_job_manager().create(session)
     return job.snapshot()
 

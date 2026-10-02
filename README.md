@@ -56,10 +56,12 @@ more accurately, at the cost of speed: tiny < base < small < medium < large), `V
 size), `AI_PROVIDER`, `SHORTS_WIDTH`/`SHORTS_HEIGHT` (default 1080x1920), `CAPTIONS_ENABLED`, and the
 `CAPTION_*` styling options. Defaults are tuned for quality over minimum data/CPU use; lower
 `MAX_VIDEO_HEIGHT`, raise `VIDEO_CRF`, or use a smaller `WHISPER_MODEL_SIZE` to go back to a
-leaner/faster setup.
+leaner/faster setup. `YTDLP_COOKIES_FILE`/`YTDLP_COOKIES_CONTENT` are usually required on cloud
+hosts - see "Deploying" below.
 
 ## Layout
 ```
+Dockerfile, .dockerignore   container build for Railway/other cloud hosts (see "Deploying")
 app/
   main.py            FastAPI app, error handlers
   config.py          .env settings
@@ -165,6 +167,39 @@ duplicated in the browser.
 
 ## Swapping the AI provider
 Subclass `MomentDetector` in `app/services/moment_detection/`, register it in `get_moment_detector()`, and set `AI_PROVIDER`.
+
+## Deploying (Railway, a VPS, or similar)
+A `Dockerfile` is included - Railway and most PaaS hosts auto-detect it and build/run the app
+directly. It installs FFmpeg, the `DejaVu Sans` caption font, and `deno` (see below), and
+binds to `0.0.0.0:$PORT` using whatever port the platform assigns at runtime.
+
+**YouTube will very likely block the server at first - this is expected on any cloud host,**
+not specific to this project. Two separate problems show up together, both visible in the
+server logs:
+
+1. **`No supported JavaScript runtime could be found`** - yt-dlp needs a JS runtime (`deno`)
+   installed to extract current YouTube video info reliably. The `Dockerfile` installs it, so
+   this is fixed automatically as long as you deploy from the Dockerfile (not a bare
+   `pip install` on a host that skips it).
+2. **`Sign in to confirm you're not a bot` / HTTP 429 Too Many Requests** - YouTube treats
+   shared datacenter IPs (Railway, most VPS providers, etc.) with suspicion, independent of
+   the JS runtime fix above. The reliable fix is giving yt-dlp cookies from a real, logged-in
+   YouTube session:
+   1. On your own computer, while logged into YouTube in Chrome/Firefox, export cookies with a
+      browser extension such as "Get cookies.txt LOCALLY" (search your browser's extension
+      store) - save it as `cookies.txt`.
+   2. On the host: either put that file on the server and set `YTDLP_COOKIES_FILE=/path/to/cookies.txt`,
+      or - if the host has no persistent file storage (Railway's default) - open `cookies.txt`
+      in a text editor, copy its full contents, and paste them into the `YTDLP_COOKIES_CONTENT`
+      environment variable. The app writes it to a file automatically on startup.
+   3. Use a throwaway/secondary Google account for this, not your main one - treat the cookie
+      file like a password (anyone with it can access that account), and expect to need to
+      refresh it occasionally as cookies expire.
+
+Without cookies configured, expect intermittent failures under real traffic even with the JS
+runtime fixed - this is YouTube's anti-bot behavior on cloud IPs, not a bug in the app.
+Every job failure includes the specific reason in its `error` field so you can tell these
+apart from an actually-unavailable or age-restricted video.
 
 ## Data usage
 - The full video is never downloaded - only the transcript and the FFmpeg byte-ranges needed for each clip.

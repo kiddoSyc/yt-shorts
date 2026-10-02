@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
     log_level: str = "INFO"
 
@@ -66,6 +66,16 @@ class Settings(BaseSettings):
     video_crf: int = Field(17, ge=0, le=51)
     video_preset: str = "fast"
 
+    # yt-dlp / YouTube access. On cloud hosts (shared datacenter IPs), YouTube often shows
+    # "Sign in to confirm you're not a bot" or rate-limits with HTTP 429. Exporting cookies
+    # from a real, logged-in YouTube session and pointing this at that file fixes most of
+    # these - see the README's "Deploying" section for how to export one.
+    ytdlp_cookies_file: str = ""
+    # Alternative for hosts with no persistent file storage (e.g. Railway): paste the full
+    # cookies.txt content into this one env var instead. Written to ytdlp_cookies_file (or a
+    # default path under data_dir) once at startup if that path isn't already set.
+    ytdlp_cookies_content: str = ""
+
     # Vertical Shorts formatting (final output, 9:16)
     shorts_width: int = Field(1080, ge=240, le=2160)
     shorts_height: int = Field(1920, ge=426, le=3840)
@@ -114,6 +124,15 @@ class Settings(BaseSettings):
         for d in (self.downloads_dir, self.transcripts_dir, self.clips_dir,
                   self.output_dir, self.shorts_dir, self.tmp_dir, self.logs_dir):
             d.mkdir(parents=True, exist_ok=True)
+        self._materialize_cookies_file()
+
+    def _materialize_cookies_file(self) -> None:
+        """If YTDLP_COOKIES_CONTENT is set but no file path is, write it to one.
+        Lets a host with no persistent file storage (e.g. Railway) pass cookies as plain env text."""
+        if self.ytdlp_cookies_content and not self.ytdlp_cookies_file:
+            path = self.resolve(self.data_dir) / "cookies.txt"
+            path.write_text(self.ytdlp_cookies_content, encoding="utf-8")
+            self.ytdlp_cookies_file = str(path)
 
 
 @lru_cache

@@ -56,6 +56,9 @@ class Job:
                 "url": self.session.url,
                 "clip_duration": self.session.clip_duration,
                 "num_clips_requested": self.session.max_moments,
+                "prompt": self.session.moment_prompt,
+                "manual_ranges": ([{"start": s, "end": e} for s, e in self.session.manual_ranges]
+                                  if self.session.manual_ranges else None),
                 "created_at": self.created_at,
                 "updated_at": self.updated_at,
             }

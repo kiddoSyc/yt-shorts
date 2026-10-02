@@ -111,7 +111,7 @@ def _format_selector(max_height: int) -> str:
 
 def build_ydl_options(settings: Settings, ffmpeg_path: str) -> dict:
     """yt-dlp options (pure function so it can be unit-tested)."""
-    return {
+    opts = {
         "format": _format_selector(settings.max_video_height),
         "merge_output_format": "mp4",
         "outtmpl": str(settings.downloads_dir / "%(id)s.%(ext)s"),
@@ -126,6 +126,9 @@ def build_ydl_options(settings: Settings, ffmpeg_path: str) -> dict:
         "retries": 3,
         "socket_timeout": 30,
     }
+    if settings.ytdlp_cookies_file:
+        opts["cookiefile"] = settings.ytdlp_cookies_file
+    return opts
 
 
 def _friendly_message(raw: str) -> str:
@@ -134,10 +137,18 @@ def _friendly_message(raw: str) -> str:
         return "This video is private."
     if "video unavailable" in low or "not available" in low:
         return "This video is unavailable."
+    if "confirm you" in low and "bot" in low:
+        return ("YouTube is blocking this server as a suspected bot (common on cloud/VPS hosting). "
+                "This isn't about the video - it needs YouTube cookies configured on the server "
+                "(see the README's Deploying section).")
     if "sign in" in low or ("age" in low and "restrict" in low):
         return "This video requires sign-in or is age-restricted."
     if "live event" in low or "is live" in low:
         return "Live streams are not supported."
+    if "429" in low or "too many requests" in low:
+        return ("YouTube is rate-limiting this server (HTTP 429). This is common on cloud hosting - "
+                "configuring YouTube cookies usually helps (see the README's Deploying section). "
+                "Try again in a few minutes either way.")
     if "unable to download" in low or "urlopen" in low or "timed out" in low:
         return "Network error while contacting YouTube. Check your connection and try again."
     return "Download failed. See logs for details."
@@ -371,6 +382,8 @@ def download_audio_only(
         "retries": 3,
         "socket_timeout": 30,
     }
+    if settings.ytdlp_cookies_file:
+        options["cookiefile"] = settings.ytdlp_cookies_file
     if ydl_factory is None:
         ydl_factory, errors = _load_ytdlp()
     else:

@@ -12,9 +12,12 @@ class MomentDetector(ABC):
 
     @abstractmethod
     def detect_moments(self, transcript: Transcript, max_moments: int = 5,
-                       target_seconds: Optional[float] = None) -> List[Moment]:
+                       target_seconds: Optional[float] = None,
+                       prompt_hint: Optional[str] = None) -> List[Moment]:
         """Return the most interesting moments in the transcript.
 
         `target_seconds` is the clip length the user asked for; moments should naturally
         fit it without cutting sentences. None means "use the configured default range".
+        `prompt_hint` is an optional free-text steer from the user on what kind of moments
+        to look for (e.g. "funny moments", "arguments about money"). None means no steer.
         """

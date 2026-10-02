@@ -14,7 +14,7 @@ from typing import Any, Callable, Optional, Tuple
 
 from app.config import Settings, get_settings
 from app.exceptions import CaptionsUnavailableError, TranscriptionError
-from app.models import PipelineResult, ProcessingSession, Transcript
+from app.models import Moment, PipelineResult, ProcessingSession, Transcript
 from app.services.clipping import clip_remote_moments
 from app.services.downloader import (YouTubeSource, check_ffmpeg, download_audio_only,
                                      download_section, make_temp_dir)
@@ -118,11 +118,20 @@ def run_session(
             source, settings, use_cache, ydl_factory, model_factory)
         notify("transcript", {"method": method})
 
-        detector = detector or get_moment_detector()
-        target_moments = session.max_moments or settings.max_moments
-        moments = detector.detect_moments(
-            transcript, max_moments=target_moments, target_seconds=session.clip_duration)
-        notify("moments", {"count": len(moments)})
+        if session.manual_ranges:
+            # User already knows exactly what they want cut - skip AI moment detection
+            # entirely and use their exact (start, end) times. Still need the transcript
+            # above for captions.
+            moments = [Moment(start=start, end=end, title=f"Clip {i}", reason="Manually selected")
+                      for i, (start, end) in enumerate(session.manual_ranges, start=1)]
+            notify("moments", {"count": len(moments), "manual": True})
+        else:
+            detector = detector or get_moment_detector()
+            target_moments = session.max_moments or settings.max_moments
+            moments = detector.detect_moments(
+                transcript, max_moments=target_moments, target_seconds=session.clip_duration,
+                prompt_hint=session.moment_prompt)
+            notify("moments", {"count": len(moments)})
 
         moments_path = settings.output_dir / f"{source.video_id}_{session.clip_duration}s_moments.json"
         moments_path.write_text(json.dumps(

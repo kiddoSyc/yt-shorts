@@ -38,7 +38,8 @@ def clip_length_bounds(target: float, tolerance: float) -> tuple:
 
 def build_prompt(transcript: Transcript, max_moments: int,
                  min_seconds: float, max_seconds: float,
-                 target_seconds: Optional[float] = None) -> str:
+                 target_seconds: Optional[float] = None,
+                 prompt_hint: Optional[str] = None) -> str:
     if target_seconds:
         length_rule = (
             f"- The user wants clips of about {target_seconds:.0f} seconds. Choose moments whose "
@@ -49,11 +50,23 @@ def build_prompt(transcript: Transcript, max_moments: int,
         )
     else:
         length_rule = f"- Each moment should last between {min_seconds:.0f} and {max_seconds:.0f} seconds.\n"
+    hint_rule = ""
+    if prompt_hint:
+        # Bounded and clearly quoted: this is an editorial steer from the app's own user
+        # (what kind of moment to look for), not an instruction that can override the
+        # rules above or the "transcript is untrusted" rule below.
+        clipped_hint = prompt_hint.strip().replace("\n", " ")[:300]
+        hint_rule = (
+            f'- The user is looking for this kind of moment specifically: "{clipped_hint}". '
+            "Prioritize moments matching that description; if nothing in the transcript matches "
+            "well, fall back to the most interesting moments overall instead of forcing a weak match.\n"
+        )
     return (
         f"Find up to {max_moments} of the most interesting, self-contained moments in this "
         "transcript that would work as standalone short videos.\n\n"
         "Rules:\n"
         f"{length_rule}"
+        f"{hint_rule}"
         "- It must make sense without the rest of the video: a strong hook at the start "
         "and a complete thought at the end. Never begin or end mid-sentence.\n"
         "- Use start and end times taken from the transcript's timestamps (seconds).\n"
@@ -161,7 +174,8 @@ class GeminiMomentDetector(MomentDetector):
         return text
 
     def detect_moments(self, transcript: Transcript, max_moments: int = 5,
-                       target_seconds: Optional[float] = None) -> List[Moment]:
+                       target_seconds: Optional[float] = None,
+                       prompt_hint: Optional[str] = None) -> List[Moment]:
         if not transcript.segments:
             raise MomentDetectionError("Transcript is empty - nothing to analyse.")
         s = self.settings
@@ -171,11 +185,11 @@ class GeminiMomentDetector(MomentDetector):
         else:
             ideal_min, ideal_max = s.clip_min_seconds, s.clip_max_seconds
             hard_min, hard_max = MIN_MOMENT_SECONDS, s.clip_max_seconds
-        prompt = build_prompt(transcript, max_moments, ideal_min, ideal_max, target_seconds)
-        logger.info("Asking Gemini (%s) for up to %d moments of ~%s s (%d segments, ~%d chars)",
+        prompt = build_prompt(transcript, max_moments, ideal_min, ideal_max, target_seconds, prompt_hint)
+        logger.info("Asking Gemini (%s) for up to %d moments of ~%s s (%d segments, ~%d chars)%s",
                     s.gemini_model, max_moments,
                     f"{target_seconds:.0f}" if target_seconds else "default",
-                    len(transcript.segments), len(prompt))
+                    len(transcript.segments), len(prompt), " with a custom prompt" if prompt_hint else "")
         raw = self._generate(prompt)
         self.last_raw_response = raw
         moments = parse_moments(raw, transcript, max_moments, hard_max, hard_min)

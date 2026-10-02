@@ -4,6 +4,6 @@ uvicorn[standard]>=0.29
 pydantic-settings>=2.2   # also reads .env
 
 # Pipeline tools (used in later steps)
-yt-dlp[default]>=2026.8.0        # YouTube downloads
+yt-dlp>=2024.4.9         # YouTube downloads
 faster-whisper>=1.0.0    # Whisper transcription (CTranslate2 build: no PyTorch, much smaller install)
 google-genai>=1.0.0      # Gemini API client (free tier)

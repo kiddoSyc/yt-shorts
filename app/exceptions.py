@@ -38,6 +38,16 @@ class InvalidMomentCountError(AppError):
     status_code = 400
 
 
+class InvalidMomentRangeError(AppError):
+    """A manually-specified clip time range is malformed (bad start/end, too long, etc.)."""
+    status_code = 400
+
+
+class InvalidPromptError(AppError):
+    """The moment-type prompt hint is not text, or too long."""
+    status_code = 400
+
+
 class JobNotFoundError(AppError):
     """No job exists with the given id (or the server has since restarted - jobs are in-memory)."""
     status_code = 404

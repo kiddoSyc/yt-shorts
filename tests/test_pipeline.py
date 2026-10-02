@@ -102,9 +102,11 @@ class FakeDetector(MomentDetector):
 
     def __init__(self):
         self.targets = []
+        self.prompt_hints = []
 
-    def detect_moments(self, transcript, max_moments=5, target_seconds=None):
+    def detect_moments(self, transcript, max_moments=5, target_seconds=None, prompt_hint=None):
         self.targets.append(target_seconds)
+        self.prompt_hints.append(prompt_hint)
         t = target_seconds
         return [Moment(start=21.0, end=21.0 + t, title=f"Best bit {t}", reason="r"),
                 Moment(start=120.0, end=120.0 + t * 0.9, title=f"Second bit {t}", reason="r")]

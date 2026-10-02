@@ -83,3 +83,93 @@ def test_new_session_settings_stays_third_positional_argument(settings):
     callers (new_session(url, duration, settings)) keep working unchanged."""
     s = new_session(URL, 90, settings)
     assert s.clip_duration == 90 and s.max_moments is None
+
+
+# ---- moment_prompt ----
+from app.exceptions import InvalidMomentRangeError, InvalidPromptError  # noqa: E402
+from app.services.session import validate_manual_ranges, validate_moment_prompt  # noqa: E402
+
+
+def test_moment_prompt_none_passes_through():
+    assert validate_moment_prompt(None) is None
+
+
+def test_moment_prompt_blank_becomes_none():
+    assert validate_moment_prompt("   ") is None
+
+
+def test_moment_prompt_trims_whitespace():
+    assert validate_moment_prompt("  funny moments  ") == "funny moments"
+
+
+def test_moment_prompt_rejects_too_long():
+    with pytest.raises(InvalidPromptError):
+        validate_moment_prompt("x" * 301)
+
+
+def test_moment_prompt_rejects_non_string():
+    with pytest.raises(InvalidPromptError):
+        validate_moment_prompt(123)
+
+
+# ---- manual_ranges ----
+def test_manual_ranges_none_passes_through(settings):
+    assert validate_manual_ranges(None, settings) is None
+
+
+def test_manual_ranges_accepts_dicts(settings):
+    out = validate_manual_ranges([{"start": 10, "end": 40}, {"start": 100, "end": 130}], settings)
+    assert out == [(10.0, 40.0), (100.0, 130.0)]
+
+
+def test_manual_ranges_accepts_tuples(settings):
+    out = validate_manual_ranges([(5, 20)], settings)
+    assert out == [(5.0, 20.0)]
+
+
+def test_manual_ranges_rejects_empty_list(settings):
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([], settings)
+
+
+def test_manual_ranges_rejects_end_before_start(settings):
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([{"start": 40, "end": 10}], settings)
+
+
+def test_manual_ranges_rejects_negative_start(settings):
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([{"start": -5, "end": 10}], settings)
+
+
+def test_manual_ranges_rejects_too_short(settings):
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([{"start": 10, "end": 11}], settings)  # 1 second
+
+
+def test_manual_ranges_rejects_too_long(settings):
+    settings.clip_duration_max = 180
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([{"start": 0, "end": 300}], settings)
+
+
+def test_manual_ranges_rejects_too_many(settings):
+    settings.max_moments_limit = 2
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges([{"start": 0, "end": 10}, {"start": 20, "end": 30},
+                                {"start": 40, "end": 50}], settings)
+
+
+def test_manual_ranges_rejects_malformed_item(settings):
+    with pytest.raises(InvalidMomentRangeError):
+        validate_manual_ranges(["not a range"], settings)
+
+
+def test_new_session_with_manual_ranges(settings):
+    s = new_session(URL, settings=settings, manual_ranges=[{"start": 10, "end": 40}])
+    assert s.manual_ranges == [(10.0, 40.0)]
+
+
+def test_new_session_with_moment_prompt(settings):
+    s = new_session(URL, settings=settings, moment_prompt="arguments about money")
+    assert s.moment_prompt == "arguments about money"

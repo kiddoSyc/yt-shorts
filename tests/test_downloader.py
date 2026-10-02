@@ -140,3 +140,35 @@ def test_missing_ffmpeg_stops_download(settings, monkeypatch):
 def test_no_download_on_import():
     # Importing the module must not import yt-dlp (lazy import) or touch the network.
     assert not hasattr(downloader, "yt_dlp")
+
+
+def test_ydl_options_omits_cookiefile_by_default(settings):
+    opts = downloader.build_ydl_options(settings, "/usr/bin/ffmpeg")
+    assert "cookiefile" not in opts
+
+
+def test_ydl_options_includes_cookiefile_when_configured(settings):
+    settings.ytdlp_cookies_file = "/app/data/cookies.txt"
+    opts = downloader.build_ydl_options(settings, "/usr/bin/ffmpeg")
+    assert opts["cookiefile"] == "/app/data/cookies.txt"
+
+
+@pytest.mark.parametrize("raw,expected_snippet", [
+    ("ERROR: [youtube] abc: Sign in to confirm you're not a bot. Use --cookies...",
+     "suspected bot"),
+    ("ERROR: [youtube] abc: HTTP Error 429: Too Many Requests", "rate-limiting"),
+    ("ERROR: Private video. Sign in if you've been granted access", "private"),
+    ("ERROR: [youtube] abc: Video unavailable", "unavailable"),
+])
+def test_friendly_message_distinguishes_causes(raw, expected_snippet):
+    msg = downloader._friendly_message(raw).lower()
+    assert expected_snippet in msg
+
+
+def test_friendly_message_bot_check_takes_priority_over_generic_sign_in():
+    # "Sign in to confirm you're not a bot" contains both "sign in" and the bot-check phrase -
+    # must report the (actionable) bot-check cause, not the generic age-restriction message.
+    raw = "ERROR: [youtube] abc: Sign in to confirm you're not a bot."
+    msg = downloader._friendly_message(raw)
+    assert "bot" in msg.lower()
+    assert "age-restricted" not in msg.lower()
