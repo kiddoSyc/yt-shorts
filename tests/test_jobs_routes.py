@@ -169,3 +169,32 @@ def test_shorts_and_clips_empty_lists_while_not_completed(client, settings, monk
     assert r.status_code == 200
     assert r.json()["shorts"] == []
     manager._executor.shutdown(wait=True)
+
+
+# ---- /status cookies diagnostics ----
+def test_status_reports_no_cookies_configured(client):
+    r = client.get("/status")
+    assert r.status_code == 200
+    assert r.json()["checks"]["cookies"] == {"configured": False}
+
+
+def test_status_reports_valid_cookies(client, settings, monkeypatch):
+    import app.api.routes as routes_mod
+    settings.ytdlp_cookies_content = ".youtube.com\tTRUE\t/\tTRUE\t1999999999\tSID\tabc123\n"
+    settings.ensure_dirs()
+    monkeypatch.setattr(routes_mod, "get_settings", lambda: settings)
+    r = client.get("/status")
+    cookies = r.json()["checks"]["cookies"]
+    assert cookies["configured"] is True
+    assert cookies["parses_correctly"] is True
+    assert cookies["cookie_count"] == 1
+    assert cookies["has_youtube_or_google_cookies"] is True
+
+
+def test_status_never_leaks_cookie_values(client, settings, monkeypatch):
+    import app.api.routes as routes_mod
+    settings.ytdlp_cookies_content = ".youtube.com\tTRUE\t/\tTRUE\t1999999999\tSID\tsupersecretvalue123\n"
+    settings.ensure_dirs()
+    monkeypatch.setattr(routes_mod, "get_settings", lambda: settings)
+    r = client.get("/status")
+    assert "supersecretvalue123" not in r.text

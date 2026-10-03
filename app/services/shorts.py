@@ -65,6 +65,24 @@ def build_ffmpeg_command(ffmpeg: str, clip_path: Path, output: Path, settings: S
     ]
 
 
+def _format_failure_message(result: subprocess.CompletedProcess) -> str:
+    """Always include the exit code - an empty stderr with a negative/137 code almost
+    always means the OS killed FFmpeg (most commonly: out of memory), not a real encode
+    error, and that distinction is the single most useful thing for diagnosing this."""
+    stderr = (result.stderr or "").strip()[-500:]
+    code = result.returncode
+    if not stderr:
+        if code == -9 or code == 137:
+            return (f"FFmpeg was killed (exit code {code}) with no error output - this is almost "
+                    "always the OS killing it for using too much memory (OOM), not a real encoding "
+                    "error. Try a lower MAX_VIDEO_HEIGHT, a smaller WHISPER_MODEL_SIZE, or a host "
+                    "with more RAM.")
+        if code < 0:
+            return f"FFmpeg was killed by signal {-code} with no error output."
+        return f"FFmpeg failed while formatting (exit code {code}, no error output)."
+    return f"{stderr} (exit code {code})"
+
+
 def format_short(
     clip: ClipInfo,
     transcript: Optional[Transcript],
@@ -108,7 +126,7 @@ def format_short(
         except subprocess.TimeoutExpired:
             raise ClippingError(f"Formatting timed out after {timeout:.0f}s for {clip_path.name}") from None
         if result.returncode != 0:
-            raise ClippingError((result.stderr or "").strip()[-500:] or "FFmpeg failed while formatting")
+            raise ClippingError(_format_failure_message(result))
         if not temp_out.exists() or temp_out.stat().st_size < _MIN_OUTPUT_BYTES:
             raise ClippingError("FFmpeg produced an empty file while formatting")
         temp_out.replace(final)

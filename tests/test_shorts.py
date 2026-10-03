@@ -115,6 +115,39 @@ def test_format_short_raises_on_ffmpeg_failure(settings, clip, monkeypatch):
         shorts.format_short(clip, None, settings, runner=failing_runner)
 
 
+@pytest.mark.parametrize("code", [-9, 137])
+def test_format_failure_message_flags_likely_oom_kill(code):
+    result = subprocess.CompletedProcess(["ffmpeg"], returncode=code, stdout="", stderr="")
+    msg = shorts._format_failure_message(result)
+    assert "OOM" in msg or "memory" in msg.lower()
+    assert str(code) in msg
+
+
+def test_format_failure_message_other_negative_code_reports_signal():
+    result = subprocess.CompletedProcess(["ffmpeg"], returncode=-11, stdout="", stderr="")
+    msg = shorts._format_failure_message(result)
+    assert "signal 11" in msg
+
+
+def test_format_failure_message_keeps_real_stderr_and_appends_exit_code():
+    result = subprocess.CompletedProcess(["ffmpeg"], returncode=1, stdout="",
+                                         stderr="Invalid data found when processing input")
+    msg = shorts._format_failure_message(result)
+    assert "Invalid data found" in msg
+    assert "exit code 1" in msg
+
+
+def test_format_short_surfaces_oom_message_on_silent_kill(settings, clip, monkeypatch):
+    monkeypatch.setattr(shorts.shutil, "which", lambda _: "/usr/bin/ffmpeg")
+
+    def killed_runner(cmd, **kw):
+        return subprocess.CompletedProcess(cmd, returncode=-9, stdout="", stderr="")
+
+    with pytest.raises(ClippingError) as exc_info:
+        shorts.format_short(clip, None, settings, runner=killed_runner)
+    assert "memory" in exc_info.value.message.lower()
+
+
 def test_format_shorts_skips_failing_clips_but_keeps_the_rest(settings, tmp_path, monkeypatch):
     monkeypatch.setattr(shorts.shutil, "which", lambda _: "/usr/bin/ffmpeg")
     good = tmp_path / "good.mp4"
